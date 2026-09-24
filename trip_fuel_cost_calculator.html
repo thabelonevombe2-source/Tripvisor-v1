@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Trip Fuel & Cost Calculator</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            900: '#14532d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for visual breakdown -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            .print-only {
+                display: block !important;
+            }
+            body {
+                background: white !important;
+                color: black !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 min-h-screen transition-colors duration-200">
+
+    <!-- Navigation Header -->
+    <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-brand-600 text-white p-2.5 rounded-xl shadow-md flex items-center justify-center">
+                    <i class="fa-solid fa-gas-pump text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg sm:text-xl text-gray-900 dark:text-white leading-tight">FuelTrip Pro</h1>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Smart Trip Fuel & Cost Estimator</p>
+                </div>
+            </div>
+
+            <!-- Header Right Controls -->
+            <div class="flex items-center space-x-3">
+                <!-- Currency Selector -->
+                <div class="relative">
+                    <select id="currencySelect" class="bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer">
+                        <option value="R">ZAR (R)</option>
+                        <option value="$" selected>USD ($)</option>
+                        <option value="€">EUR (€)</option>
+                        <option value="£">GBP (£)</option>
+                        <option value="A$">AUD (A$)</option>
+                        <option value="₹">INR (₹)</option>
+                        <option value="C$">CAD (C$)</option>
+                    </select>
+                </div>
+
+                <!-- Dark Mode Toggle Button -->
+                <button id="themeToggle" class="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+                    <i class="fa-solid fa-moon dark:hidden text-lg"></i>
+                    <i class="fa-solid fa-sun hidden dark:block text-lg text-amber-400"></i>
+                </button>
+
+                <!-- Export PDF / Print -->
+                <button id="btnPrint" onclick="window.print()" class="hidden sm:flex items-center space-x-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors">
+                    <i class="fa-solid fa-print"></i>
+                    <span>Print</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+
+        <!-- Disclaimer Banner -->
+        <div class="mb-6 p-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800/50 rounded-2xl flex items-start space-x-3 text-amber-800 dark:text-amber-300 text-xs sm:text-sm">
+            <i class="fa-solid fa-circle-info text-amber-500 text-lg mt-0.5 flex-shrink-0"></i>
+            <div>
+                <span class="font-semibold">Note & Disclaimer:</span> Fuel economy figures generated by this calculator are <strong>estimates</strong> based on official standard manufacturer averages. Real-world fuel consumption varies depending on traffic conditions, driving style, road gradient, tire pressure, cargo weight, vehicle age, and air conditioning usage.
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
+
+            <!-- LEFT COLUMN: Inputs Section (5 Cols on large screen) -->
+            <div class="lg:col-span-5 space-y-6">
+
+                <!-- Card 1: Route & Distance Settings -->
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 sm:p-6 transition-all">
+                    <div class="flex items-center space-x-2.5 mb-4 text-gray-900 dark:text-white font-semibold text-base border-b border-gray-100 dark:border-gray-700/60 pb-3">
+                        <i class="fa-solid fa-route text-brand-600 dark:text-brand-500"></i>
+                        <span>1. Route & Distance</span>
+                    </div>
+
+                    <div class="space-y-4">
+                        <!-- Origin & Destination Inputs -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Origin (Optional)</label>
+                                <input type="text" id="inputOrigin" placeholder="e.g. Home / City A" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Destination (Optional)</label>
+                                <input type="text" id="inputDestination" placeholder="e.g. Office / City B" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                            </div>
+                        </div>
+
+                        <!-- Distance Entry -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                                    One-Way Distance <span class="text-red-500">*</span>
+                                </label>
+                                <span class="text-xs text-brand-600 dark:text-brand-400 font-medium">Exact kilometers</span>
+                            </div>
+                            <div class="relative rounded-xl shadow-sm">
+                                <input type="number" id="inputDistance" min="0.1" step="0.1" value="45" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl pl-3 pr-14 py-2.5 text-base font-semibold text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400 font-medium text-xs sm:text-sm">
+                                    km
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Round Trip Toggle -->
+                        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600/50">
+                            <div class="flex items-center space-x-2.5">
+                                <i class="fa-solid fa-arrows-left-right text-gray-500 dark:text-gray-400"></i>
+                                <span class="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200">Include Return Trip?</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="checkRoundTrip" checked class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:after:border-gray-600 peer-checked:bg-brand-600"></div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 2: Vehicle & Fuel Specifications -->
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 sm:p-6 transition-all">
+                    <div class="flex items-center space-x-2.5 mb-4 text-gray-900 dark:text-white font-semibold text-base border-b border-gray-100 dark:border-gray-700/60 pb-3">
+                        <i class="fa-solid fa-car text-brand-600 dark:text-brand-500"></i>
+                        <span>2. Vehicle & Engine Profile</span>
+                    </div>
+
+                    <div class="space-y-4">
+                        <!-- Vehicle Preset Select -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Make / Preset Profile</label>
+                            <select id="presetVehicle" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-xs sm:text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none cursor-pointer">
+                                <option value="custom">-- Custom Specification --</option>
+                                <option value="sedan_small">Compact Hatchback / Sedan (1.0L - 1.4L Petrol) ~5.8 L/100km</option>
+                                <option value="sedan_med" selected>Midsize Sedan / SUV (1.6L - 2.0L Petrol) ~7.5 L/100km</option>
+                                <option value="suv_large">Large SUV / 4x4 (3.0L V6 Petrol) ~11.5 L/100km</option>
+                                <option value="diesel_med">Diesel Sedan / Crossover (2.0L Diesel) ~5.2 L/100km</option>
+                                <option value="truck_diesel">Pickup Truck / Bakkie (2.8L - 3.2L Diesel) ~9.5 L/100km</option>
+                                <option value="hybrid">Full Hybrid (e.g., Prius / Corolla Cross) ~4.2 L/100km</option>
+                                <option value="electric">Electric Vehicle (e.g., Model 3 / Leaf) ~16.5 kWh/100km</option>
+                            </select>
+                        </div>
+
+                        <!-- Engine Type & Fuel Consumption -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Engine / Fuel Type</label>
+                                <select id="fuelType" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-xs sm:text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                    <option value="petrol" selected>Petrol (Unleaded)</option>
+                                    <option value="diesel">Diesel</option>
+                                    <option value="electric">Electric (EV)</option>
+                                    <option value="hybrid">Hybrid</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1" id="lblConsumption">Consumption Rate</label>
+                                <div class="relative rounded-xl shadow-sm">
+                                    <input type="number" id="inputConsumption" min="0.5" step="0.1" value="7.5" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl pl-3 pr-16 py-2 text-sm font-semibold text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400 text-xs font-medium" id="unitConsumption">
+                                        L/100km
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Fuel Price per Liter -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1" id="lblFuelPrice">Fuel Price per Liter</label>
+                            <div class="relative rounded-xl shadow-sm">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 font-semibold text-sm currency-symbol">
+                                    $
+                                </div>
+                                <input type="number" id="inputFuelPrice" min="0.01" step="0.01" value="1.65" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl pl-8 pr-16 py-2 text-sm font-semibold text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400 text-xs font-medium" id="unitFuelPrice">
+                                    / Liter
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 3: Timeframe & Driving Conditions -->
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 sm:p-6 transition-all">
+                    <div class="flex items-center space-x-2.5 mb-4 text-gray-900 dark:text-white font-semibold text-base border-b border-gray-100 dark:border-gray-700/60 pb-3">
+                        <i class="fa-solid fa-calendar-days text-brand-600 dark:text-brand-500"></i>
+                        <span>3. Timeframe & Adjustments</span>
+                    </div>
+
+                    <div class="space-y-4">
+                        <!-- Filter Timeframe Selector -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Timeframe / Commute Frequency</label>
+                            <select id="timeframeSelect" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-gray-800 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none cursor-pointer">
+                                <option value="single">Single Trip (1 Day)</option>
+                                <option value="workweek" selected>Weekly Work Commute (5 Days / Week)</option>
+                                <option value="fullweek">Full Week Commute (7 Days / Week)</option>
+                                <option value="workmonth">Monthly Work Commute (~22 Days / Month)</option>
+                                <option value="fullmonth">Full Month Total (30 Days)</option>
+                                <option value="annual">Annual Total (365 Days)</option>
+                            </select>
+                        </div>
+
+                        <!-- Driving Condition Buffer Slider -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-xs font-medium text-gray-600 dark:text-gray-400">Traffic & Road Condition Margin</label>
+                                <span id="lblTrafficMargin" class="text-xs font-bold text-brand-600 dark:text-brand-400">+0% (Normal)</span>
+                            </div>
+                            <input type="range" id="rangeTraffic" min="0" max="30" step="5" value="0" class="w-full accent-brand-600 bg-gray-200 dark:bg-gray-700 h-2 rounded-lg cursor-pointer">
+                            <div class="flex justify-between text-[10px] text-gray-400 mt-1">
+                                <span>Ideal Highway</span>
+                                <span>City Traffic (+15%)</span>
+                                <span>Heavy Traffic / Hill (+30%)</span>
+                            </div>
+                        </div>
+
+                        <!-- Reset / Action Buttons -->
+                        <div class="pt-2 flex space-x-3">
+                            <button id="btnReset" class="flex-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium py-2 rounded-xl text-xs sm:text-sm transition-colors flex items-center justify-center space-x-1">
+                                <i class="fa-solid fa-rotate-left"></i>
+                                <span>Reset Defaults</span>
+                            </button>
+                            <button id="btnSaveTrip" class="flex-1 bg-brand-50 dark:bg-brand-900/40 hover:bg-brand-100 text-brand-700 dark:text-brand-300 font-medium py-2 rounded-xl text-xs sm:text-sm transition-colors flex items-center justify-center space-x-1 border border-brand-200 dark:border-brand-800">
+                                <i class="fa-solid fa-bookmark"></i>
+                                <span>Save Trip</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT COLUMN: Output Dashboard & Charts (7 Cols on large screen) -->
+            <div class="lg:col-span-7 space-y-6">
+
+                <!-- Primary Summary Highlight Card -->
+                <div class="bg-gradient-to-br from-gray-900 to-gray-800 text-white rounded-2xl shadow-lg p-6 relative overflow-hidden">
+                    <div class="absolute -right-6 -bottom-6 text-gray-800/40 pointer-events-none">
+                        <i class="fa-solid fa-car-side text-9xl"></i>
+                    </div>
+
+                    <div class="relative z-10 space-y-4">
+                        <div class="flex justify-between items-center border-b border-gray-700/80 pb-3">
+                            <div class="flex items-center space-x-2">
+                                <span id="outputTimeframeBadge" class="bg-brand-500/20 text-brand-400 border border-brand-500/30 text-xs px-2.5 py-1 rounded-full font-medium">
+                                    Weekly Work Commute (5 Days)
+                                </span>
+                            </div>
+                            <span class="text-xs text-gray-400">Estimated Total</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <!-- Total Fuel Cost -->
+                            <div>
+                                <p class="text-xs text-gray-400 font-medium mb-1">Total Fuel Cost</p>
+                                <div class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white flex items-baseline space-x-1">
+                                    <span class="currency-symbol">$</span>
+                                    <span id="resTotalCost">0.00</span>
+                                </div>
+                                <p class="text-[11px] text-gray-400 mt-1" id="resCostPerKmDesc">Cost per km: $0.12</p>
+                            </div>
+
+                            <!-- Total Fuel Needed -->
+                            <div>
+                                <p class="text-xs text-gray-400 font-medium mb-1">Total Fuel / Energy Needed</p>
+                                <div class="text-3xl sm:text-4xl font-extrabold tracking-tight text-brand-400 flex items-baseline space-x-1">
+                                    <span id="resTotalFuel">0.0</span>
+                                    <span id="resFuelUnit" class="text-xl font-medium text-brand-300">L</span>
+                                </div>
+                                <p class="text-[11px] text-gray-400 mt-1" id="resTotalDistanceDesc">Total distance: 450 km</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Secondary Quick Metrics Cards -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                    <div class="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm text-center">
+                        <i class="fa-solid fa-clock text-gray-400 text-xs mb-1"></i>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400 font-medium">Per Trip</p>
+                        <p class="text-base sm:text-lg font-bold text-gray-900 dark:text-white mt-0.5"><span class="currency-symbol">$</span><span id="resPerTripCost">0.00</span></p>
+                        <p class="text-[10px] text-gray-400" id="resPerTripFuel">0.0 L</p>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm text-center">
+                        <i class="fa-solid fa-calendar-day text-brand-500 text-xs mb-1"></i>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400 font-medium">Per Day</p>
+                        <p class="text-base sm:text-lg font-bold text-gray-900 dark:text-white mt-0.5"><span class="currency-symbol">$</span><span id="resPerDayCost">0.00</span></p>
+                        <p class="text-[10px] text-gray-400" id="resPerDayFuel">0.0 L</p>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm text-center">
+                        <i class="fa-solid fa-calendar-week text-blue-500 text-xs mb-1"></i>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400 font-medium">Per Week (7d)</p>
+                        <p class="text-base sm:text-lg font-bold text-gray-900 dark:text-white mt-0.5"><span class="currency-symbol">$</span><span id="resPerWeekCost">0.00</span></p>
+                        <p class="text-[10px] text-gray-400" id="resPerWeekFuel">0.0 L</p>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm text-center">
+                        <i class="fa-solid fa-calendar-month text-purple-500 text-xs mb-1"></i>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400 font-medium">Per Month (30d)</p>
+                        <p class="text-base sm:text-lg font-bold text-gray-900 dark:text-white mt-0.5"><span class="currency-symbol">$</span><span id="resPerMonthCost">0.00</span></p>
+                        <p class="text-[10px] text-gray-400" id="resPerMonthFuel">0.0 L</p>
+                    </div>
+                </div>
+
+                <!-- Visual Bar Chart Section -->
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 sm:p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-2">
+                            <i class="fa-solid fa-chart-simple text-brand-600 dark:text-brand-500"></i>
+                            <h3 class="font-semibold text-sm sm:text-base text-gray-900 dark:text-white">Cost Breakdown Across Periods</h3>
+                        </div>
+                        <span class="text-xs text-gray-400">Dynamic Projection</span>
+                    </div>
+                    <div class="h-56 sm:h-64 relative">
+                        <canvas id="costChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Detailed Table Breakdown -->
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                    <div class="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                        <h3 class="font-semibold text-sm text-gray-900 dark:text-white flex items-center space-x-2">
+                            <i class="fa-solid fa-table-list text-brand-600"></i>
+                            <span>Time Period Breakdown Table</span>
+                        </h3>
+                        <button id="btnExportCSV" class="text-xs text-brand-600 dark:text-brand-400 font-medium hover:underline flex items-center space-x-1">
+                            <i class="fa-solid fa-file-csv"></i>
+                            <span>Export CSV</span>
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs sm:text-sm">
+                            <thead class="bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 uppercase font-semibold text-[10px] tracking-wider">
+                                <tr>
+                                    <th class="px-4 py-3">Time Period</th>
+                                    <th class="px-4 py-3">Days</th>
+                                    <th class="px-4 py-3">Distance</th>
+                                    <th class="px-4 py-3">Fuel Needed</th>
+                                    <th class="px-4 py-3 text-right">Est. Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBreakdownBody" class="divide-y divide-gray-100 dark:divide-gray-700 text-gray-700 dark:text-gray-300">
+                                <!-- Dynamic JavaScript Content -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Saved Trips Drawer/Section -->
+                <div id="savedTripsContainer" class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 hidden">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-semibold text-sm text-gray-900 dark:text-white flex items-center space-x-2">
+                            <i class="fa-solid fa-bookmark text-amber-500"></i>
+                            <span>Saved Calculation Snapshots</span>
+                        </h3>
+                        <button id="btnClearSaved" class="text-xs text-red-500 hover:underline">Clear All</button>
+                    </div>
+                    <div id="savedTripsList" class="space-y-2">
+                        <!-- Saved items populated here -->
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // --- PRESET VEHICLE DATA ---
+        const vehiclePresets = {
+            custom: null,
+            sedan_small: { fuelType: 'petrol', consumption: 5.8 },
+            sedan_med: { fuelType: 'petrol', consumption: 7.5 },
+            suv_large: { fuelType: 'petrol', consumption: 11.5 },
+            diesel_med: { fuelType: 'diesel', consumption: 5.2 },
+            truck_diesel: { fuelType: 'diesel', consumption: 9.5 },
+            hybrid: { fuelType: 'hybrid', consumption: 4.2 },
+            electric: { fuelType: 'electric', consumption: 16.5 }
+        };
+
+        // --- DOM ELEMENTS ---
+        const currencySelect = document.getElementById('currencySelect');
+        const themeToggle = document.getElementById('themeToggle');
+        
+        const inputOrigin = document.getElementById('inputOrigin');
+        const inputDestination = document.getElementById('inputDestination');
+        const inputDistance = document.getElementById('inputDistance');
+        const checkRoundTrip = document.getElementById('checkRoundTrip');
+        
+        const presetVehicle = document.getElementById('presetVehicle');
+        const fuelType = document.getElementById('fuelType');
+        const inputConsumption = document.getElementById('inputConsumption');
+        const inputFuelPrice = document.getElementById('inputFuelPrice');
+        const lblConsumption = document.getElementById('lblConsumption');
+        const unitConsumption = document.getElementById('unitConsumption');
+        const lblFuelPrice = document.getElementById('lblFuelPrice');
+        const unitFuelPrice = document.getElementById('unitFuelPrice');
+        
+        const timeframeSelect = document.getElementById('timeframeSelect');
+        const rangeTraffic = document.getElementById('rangeTraffic');
+        const lblTrafficMargin = document.getElementById('lblTrafficMargin');
+        
+        const resTotalCost = document.getElementById('resTotalCost');
+        const resTotalFuel = document.getElementById('resTotalFuel');
+        const resFuelUnit = document.getElementById('resFuelUnit');
+        const resCostPerKmDesc = document.getElementById('resCostPerKmDesc');
+        const resTotalDistanceDesc = document.getElementById('resTotalDistanceDesc');
+        const outputTimeframeBadge = document.getElementById('outputTimeframeBadge');
+
+        const resPerTripCost = document.getElementById('resPerTripCost');
+        const resPerTripFuel = document.getElementById('resPerTripFuel');
+        const resPerDayCost = document.getElementById('resPerDayCost');
+        const resPerDayFuel = document.getElementById('resPerDayFuel');
+        const resPerWeekCost = document.getElementById('resPerWeekCost');
+        const resPerWeekFuel = document.getElementById('resPerWeekFuel');
+        const resPerMonthCost = document.getElementById('resPerMonthCost');
+        const resPerMonthFuel = document.getElementById('resPerMonthFuel');
+
+        const tableBreakdownBody = document.getElementById('tableBreakdownBody');
+        const btnReset = document.getElementById('btnReset');
+        const btnSaveTrip = document.getElementById('btnSaveTrip');
+        const btnExportCSV = document.getElementById('btnExportCSV');
+        const savedTripsContainer = document.getElementById('savedTripsContainer');
+        const savedTripsList = document.getElementById('savedTripsList');
+        const btnClearSaved = document.getElementById('btnClearSaved');
+
+        let myChart = null;
+
+        // --- THEME MANAGEMENT ---
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        themeToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            updateChart();
+        });
+
+        // --- MAIN CALCULATION LOGIC ---
+        function calculate() {
+            // Currency Update
+            const currency = currencySelect.value;
+            document.querySelectorAll('.currency-symbol').forEach(el => el.textContent = currency);
+
+            // Distance Calculation
+            const oneWayDist = parseFloat(inputDistance.value) || 0;
+            const isRoundTrip = checkRoundTrip.checked;
+            const tripDist = isRoundTrip ? oneWayDist * 2 : oneWayDist;
+
+            // Fuel Specs
+            const isEV = fuelType.value === 'electric';
+            let rate = parseFloat(inputConsumption.value) || 0;
+            const unitText = isEV ? 'kWh' : 'L';
+            const price = parseFloat(inputFuelPrice.value) || 0;
+
+            // Labels update
+            if (isEV) {
+                lblConsumption.textContent = "Energy Consumption";
+                unitConsumption.textContent = "kWh/100km";
+                lblFuelPrice.textContent = "Electricity Price";
+                unitFuelPrice.textContent = "/ kWh";
+            } else {
+                lblConsumption.textContent = "Consumption Rate";
+                unitConsumption.textContent = "L/100km";
+                lblFuelPrice.textContent = "Fuel Price";
+                unitFuelPrice.textContent = "/ Liter";
+            }
+            resFuelUnit.textContent = unitText;
+
+            // Traffic Buffer Adjustment
+            const bufferPercent = parseInt(rangeTraffic.value) || 0;
+            lblTrafficMargin.textContent = bufferPercent === 0 ? "+0% (Normal)" : `+${bufferPercent}% Heavy`;
+            const adjustedRate = rate * (1 + (bufferPercent / 100));
+
+            // Single Trip Calculations
+            const fuelPerTrip = (tripDist * adjustedRate) / 100;
+            const costPerTrip = fuelPerTrip * price;
+            const costPerKm = tripDist > 0 ? (costPerTrip / tripDist) : 0;
+
+            // Timeframe Multipliers
+            const timeframe = timeframeSelect.value;
+            let daysMultiplier = 1;
+            let labelText = "Single Trip";
+
+            switch (timeframe) {
+                case 'single':
+                    daysMultiplier = 1;
+                    labelText = "Single Trip (1 Day)";
+                    break;
+                case 'workweek':
+                    daysMultiplier = 5;
+                    labelText = "Weekly Work Commute (5 Days)";
+                    break;
+                case 'fullweek':
+                    daysMultiplier = 7;
+                    labelText = "Full Week (7 Days)";
+                    break;
+                case 'workmonth':
+                    daysMultiplier = 22;
+                    labelText = "Monthly Work Commute (22 Days)";
+                    break;
+                case 'fullmonth':
+                    daysMultiplier = 30;
+                    labelText = "Full Month (30 Days)";
+                    break;
+                case 'annual':
+                    daysMultiplier = 365;
+                    labelText = "Annual Total (365 Days)";
+                    break;
+            }
+
+            outputTimeframeBadge.textContent = labelText;
+
+            // Total Aggregated Values for selected timeframe
+            const totalDistance = tripDist * daysMultiplier;
+            const totalFuel = fuelPerTrip * daysMultiplier;
+            const totalCost = costPerTrip * daysMultiplier;
+
+            // Update Primary Summary Card
+            resTotalCost.textContent = totalCost.toFixed(2);
+            resTotalFuel.textContent = totalFuel.toFixed(1);
+            resCostPerKmDesc.textContent = `Cost per km: ${currency}${costPerKm.toFixed(2)}`;
+            resTotalDistanceDesc.textContent = `Total distance: ${totalDistance.toLocaleString()} km (${daysMultiplier} days)`;
+
+            // Update Quick Metric Cards
+            resPerTripCost.textContent = costPerTrip.toFixed(2);
+            resPerTripFuel.textContent = `${fuelPerTrip.toFixed(1)} ${unitText}`;
+
+            resPerDayCost.textContent = costPerTrip.toFixed(2); // assuming 1 trip/day
+            resPerDayFuel.textContent = `${fuelPerTrip.toFixed(1)} ${unitText}`;
+
+            resPerWeekCost.textContent = (costPerTrip * 7).toFixed(2);
+            resPerWeekFuel.textContent = `${(fuelPerTrip * 7).toFixed(1)} ${unitText}`;
+
+            resPerMonthCost.textContent = (costPerTrip * 30).toFixed(2);
+            resPerMonthFuel.textContent = `${(fuelPerTrip * 30).toFixed(1)} ${unitText}`;
+
+            // Update Table Breakdown
+            updateTable({
+                currency,
+                tripDist,
+                fuelPerTrip,
+                costPerTrip,
+                unitText
+            });
+
+            // Update Chart
+            updateChartData(costPerTrip);
+        }
+
+        // --- TABLE GENERATION ---
+        function updateTable(data) {
+            const periods = [
+                { name: 'Single Trip', days: 1 },
+                { name: 'Work Week', days: 5 },
+                { name: 'Full Week', days: 7 },
+                { name: 'Work Month', days: 22 },
+                { name: 'Full Month', days: 30 },
+                { name: 'Annual', days: 365 }
+            ];
+
+            tableBreakdownBody.innerHTML = periods.map(p => {
+                const dist = data.tripDist * p.days;
+                const fuel = data.fuelPerTrip * p.days;
+                const cost = data.costPerTrip * p.days;
+
+                return `
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                        <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">${p.name}</td>
+                        <td class="px-4 py-3">${p.days}</td>
+                        <td class="px-4 py-3">${dist.toLocaleString()} km</td>
+                        <td class="px-4 py-3">${fuel.toFixed(1)} ${data.unitText}</td>
+                        <td class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">${data.currency}${cost.toFixed(2)}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // --- CHART JS SETUP ---
+        function initChart() {
+            const ctx = document.getElementById('costChart').getContext('2d');
+            const isDark = document.documentElement.classList.contains('dark');
+
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['1 Trip', '1 Day', '1 Week (7d)', '1 Month (30d)', '1 Year (365d)'],
+                    datasets: [{
+                        label: 'Estimated Cost',
+                        data: [0, 0, 0, 0, 0],
+                        backgroundColor: '#22c55e',
+                        borderRadius: 8,
+                        hoverBackgroundColor: '#16a34a'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => {
+                                    const curr = currencySelect.value;
+                                    return ` Cost: ${curr}${context.parsed.y.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: isDark ? '#9ca3af' : '#4b5563' }
+                        },
+                        y: {
+                            grid: { color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' },
+                            ticks: { color: isDark ? '#9ca3af' : '#4b5563' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChartData(costPerTrip) {
+            if (!myChart) return;
+            const data = [
+                costPerTrip,
+                costPerTrip,
+                costPerTrip * 7,
+                costPerTrip * 30,
+                costPerTrip * 365
+            ];
+            myChart.data.datasets[0].data = data;
+            
+            const isDark = document.documentElement.classList.contains('dark');
+            myChart.options.scales.x.ticks.color = isDark ? '#9ca3af' : '#4b5563';
+            myChart.options.scales.y.ticks.color = isDark ? '#9ca3af' : '#4b5563';
+            myChart.options.scales.y.grid.color = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+            
+            myChart.update();
+        }
+
+        function updateChart() {
+            calculate();
+        }
+
+        // --- EVENT LISTENERS ---
+        presetVehicle.addEventListener('change', () => {
+            const presetKey = presetVehicle.value;
+            if (presetKey !== 'custom' && vehiclePresets[presetKey]) {
+                const preset = vehiclePresets[presetKey];
+                fuelType.value = preset.fuelType;
+                inputConsumption.value = preset.consumption;
+
+                // Set standard price defaults if untouched
+                if (preset.fuelType === 'electric') {
+                    inputFuelPrice.value = '0.28';
+                } else if (preset.fuelType === 'diesel') {
+                    inputFuelPrice.value = '1.75';
+                } else {
+                    inputFuelPrice.value = '1.65';
+                }
+            }
+            calculate();
+        });
+
+        // Input Change Listeners
+        [inputDistance, checkRoundTrip, fuelType, inputConsumption, inputFuelPrice, timeframeSelect, rangeTraffic, currencySelect, inputOrigin, inputDestination].forEach(element => {
+            element.addEventListener('input', calculate);
+            element.addEventListener('change', calculate);
+        });
+
+        // Reset Button
+        btnReset.addEventListener('click', () => {
+            inputOrigin.value = '';
+            inputDestination.value = '';
+            inputDistance.value = '45';
+            checkRoundTrip.checked = true;
+            presetVehicle.value = 'sedan_med';
+            fuelType.value = 'petrol';
+            inputConsumption.value = '7.5';
+            inputFuelPrice.value = '1.65';
+            timeframeSelect.value = 'workweek';
+            rangeTraffic.value = '0';
+            calculate();
+        });
+
+        // Export CSV
+        btnExportCSV.addEventListener('click', () => {
+            const currency = currencySelect.value;
+            const rows = [
+                ["Time Period", "Days", "Distance (km)", "Fuel Required", `Cost (${currency})`]
+            ];
+
+            const tbodyRows = tableBreakdownBody.querySelectorAll('tr');
+            tbodyRows.forEach(row => {
+                const cols = row.querySelectorAll('td');
+                if (cols.length >= 5) {
+                    rows.push([
+                        cols[0].innerText,
+                        cols[1].innerText,
+                        cols[2].innerText,
+                        cols[3].innerText,
+                        cols[4].innerText.replace(currency, '')
+                    ]);
+                }
+            });
+
+            let csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "Trip_Fuel_Cost_Breakdown.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        // Saved Trips Feature
+        let savedTrips = [];
+        btnSaveTrip.addEventListener('click', () => {
+            const origin = inputOrigin.value.trim() || 'Origin';
+            const dest = inputDestination.value.trim() || 'Destination';
+            const name = `${origin} to ${dest}`;
+            const cost = resTotalCost.textContent;
+            const curr = currencySelect.value;
+
+            savedTrips.push({ name, cost, curr, dist: inputDistance.value });
+            renderSavedTrips();
+        });
+
+        function renderSavedTrips() {
+            if (savedTrips.length === 0) {
+                savedTripsContainer.classList.add('hidden');
+                return;
+            }
+            savedTripsContainer.classList.remove('hidden');
+            savedTripsList.innerHTML = savedTrips.map((item, idx) => `
+                <div class="flex justify-between items-center bg-gray-50 dark:bg-gray-700/50 p-2.5 rounded-xl text-xs">
+                    <div>
+                        <p class="font-semibold text-gray-800 dark:text-gray-200">${item.name}</p>
+                        <p class="text-gray-400">${item.dist} km (One-way)</p>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-brand-600 dark:text-brand-400">${item.curr}${item.cost}</span>
+                        <button onclick="deleteSavedTrip(${idx})" class="text-red-400 hover:text-red-600"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        window.deleteSavedTrip = function(idx) {
+            savedTrips.splice(idx, 1);
+            renderSavedTrips();
+        };
+
+        btnClearSaved.addEventListener('click', () => {
+            savedTrips = [];
+            renderSavedTrips();
+        });
+
+        // On Window Load
+        window.onload = function() {
+            initChart();
+            calculate();
+        };
+    </script>
+</body>
+</html>
