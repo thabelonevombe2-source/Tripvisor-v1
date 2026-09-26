@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FuelTrip Pro - Advanced Trip Fuel, Toll & Cost Calculator</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Leaflet.js CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        #map {
+            height: 320px;
+            border-radius: 1rem;
+            z-index: 10;
+        }
+        .autocomplete-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 50;
+        }
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background: white !important;
+                color: black !important;
+            }
+            .print-card {
+                box-shadow: none !important;
+                border: 1px solid #ccc !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 min-h-screen transition-colors duration-200 pb-12">
+
+    <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40 shadow-sm no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-brand-600 text-white p-2.5 rounded-xl shadow-md flex items-center justify-center">
+                    <i class="fa-solid fa-gas-pump text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg sm:text-xl text-gray-900 dark:text-white leading-tight">FuelTrip Pro</h1>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Route, Fuel, Toll & Cost Intelligence</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <!-- Regional Presets Dropdown -->
+                <div class="hidden md:flex items-center space-x-1.5 text-xs text-gray-500 dark:text-gray-400 mr-2">
+                    <i class="fa-solid fa-globe"></i>
+                    <span>Region:</span>
+                </div>
+                <select id="regionSelect" class="bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer">
+                    <option value="ZA" selected>🇿🇦 South Africa (ZAR)</option>
+                    <option value="US">🇺🇸 United States (USD)</option>
+                    <option value="UK">🇬🇧 United Kingdom (GBP)</option>
+                    <option value="EU">🇪🇺 Eurozone (EUR)</option>
+                    <option value="AU">🇦🇺 Australia (AUD)</option>
+                    <option value="IN">🇮🇳 India (INR)</option>
+                </select>
+
+                <select id="currencySelect" class="bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg px-2 py-1.5 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-500 cursor-pointer">
+                    <option value="R">ZAR (R)</option>
+                    <option value="$">USD ($)</option>
+                    <option value="€">EUR (€)</option>
+                    <option value="£">GBP (£)</option>
+                    <option value="A$">AUD (A$)</option>
+                    <option value="₹">INR (₹)</option>
+                </select>
+
+                <button id="themeToggle" class="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors" title="Toggle Theme">
+                    <i class="fa-solid fa-moon dark:hidden text-lg"></i>
+                    <i class="fa-solid fa-sun hidden dark:block text-lg text-amber-400"></i>
+                </button>
+
+                <button onclick="window.print()" class="hidden sm:flex items-center space-x-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors">
+                    <i class="fa-solid fa-print"></i>
+                    <span>Print</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+
+        <!-- Disclaimer Banner -->
+        <div class="mb-6 p-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800/50 rounded-2xl flex items-start space-x-3 text-amber-800 dark:text-amber-300 text-xs sm:text-sm shadow-sm">
+            <i class="fa-solid fa-circle-info text-amber-500 text-lg mt-0.5 flex-shrink-0"></i>
+            <div>
+                <span class="font-semibold">Live Route & Cost Estimations:</span> Route distances are calculated via <strong>OSRM / OpenStreetMap</strong>. Fuel rates, toll fees, and vehicle maintenance factors are estimates based on standard regional parameters.
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
+
+            <div class="lg:col-span-5 space-y-6 no-print">
+
+                <!-- Step 1: Interactive Route Resolver -->
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 sm:p-6">
+                    <div class="flex items-center justify-between mb-4 border-b border-gray-100 dark:border-gray-700/60 pb-3">
+                        <div class="flex items-center space-x-2.5 text-gray-900 dark:text-white font-semibold text-base">
+                            <i class="fa-solid fa-route text-brand-600 dark:text-brand-500"></i>
+                            <span>1. Route & Live GPS Map</span>
+                        </div>
+                        <span id="routeStatusBadge" class="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 font-medium">Ready</span>
+                    </div>
+
+                    <div class="space-y-4">
+                        <!-- Origin Input with Autocomplete -->
+                        <div class="relative">
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Origin Location</label>
+                            <div class="relative">
+                                <input type="text" id="inputOrigin" placeholder="Type city or address..." class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl pl-8 pr-3 py-2 text-xs sm:text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none" autocomplete="off">
+                                <i class="fa-solid fa-location-dot absolute left-3 top-2.5 text-brand-600 dark:text-brand-400 text-xs"></i>
+                            </div>
+                            <div id="originSuggestions" class="autocomplete-suggestions bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg hidden divide-y divide-gray-100 dark:divide-gray-700"></div>
+                        </div>
+
+                        <!-- Destination Input with Autocomplete -->
+                        <div class="relative">
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Destination Location</label>
+                            <div class="relative">
+                                <input type="text" id="inputDestination" placeholder="Type city or address..." class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl pl-8 pr-3 py-2 text-xs sm:text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none" autocomplete="off">
+                                <i class="fa-solid fa-flag-checkered absolute left-3 top-2.5 text-red-500 text-xs"></i>
+                            </div>
+                            <div id="destSuggestions" class="autocomplete-suggestions bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg hidden divide-y divide-gray-100 dark:divide-gray-700"></div>
+                        </div>
+
+                        <div class="flex space-x-2">
+                            <button id="btnCalculateRoute" class="flex-1 bg-brand-600 hover:bg-brand-700 text-white font-medium py-2 rounded-xl text-xs sm:text-sm transition-colors flex items-center justify-center space-x-2 shadow-sm">
+                                <i class="fa-solid fa-location-arrow"></i>
+                                <span>Calculate GPS Route</span>
+                            </button>
+                        </div>
+
+                        <!-- Manual Distance Override & Presets -->
+                        <div class="pt-2 border-t border-gray-100 dark:border-gray-700/60">
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                                    One-Way Distance <span class="text-xs text-gray-400 font-normal">(Manual / Calculated)</span>
+                                </label>
+                            </div>
+                            <div class="relative rounded-xl shadow-sm">
+                                <input type="number" id="inputDistance" min="0.1" step="0.1" value="50" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl pl-3 pr-14 py-2 text-sm font-bold text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400 font-medium text-xs">
+                                    km
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Presets -->
+                        <div class="flex flex-wrap gap-1.5">
+                            <button type="button" onclick="setPresetDistance(10)" class="px-2.5 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg font-medium transition-colors">10 km</button>
+                            <button type="button" onclick="setPresetDistance(25)" class="px-2.5 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg font-medium transition-colors">25 km</button>
+                            <button type="button" onclick="setPresetDistance(50)" class="px-2.5 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg font-medium transition-colors">50 km</button>
+                            <button type="button" onclick="setPresetDistance(100)" class="px-2.5 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg font-medium transition-colors">100 km</button>
+                            <button type="button" onclick="setPresetDistance(250)" class="px-2.5 py-1 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg font-medium transition-colors">250 km</button>
+                        </div>
+
+                        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600/50">
+                            <div class="flex items-center space-x-2.5">
+                                <i class="fa-solid fa-arrows-left-right text-gray-500 dark:text-gray-400"></i>
+                                <span class="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200">Include Return Trip?</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="checkRoundTrip" checked class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:after:border-gray-600 peer-checked:bg-brand-600"></div>
+                            </label>
+                        </div>
+
+                        <!-- Leaflet Interactive Map Container -->
+                        <div class="mt-3">
+                            <div id="map"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Vehicle Database & Fuel Spec -->
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 sm:p-6">
+                    <div class="flex items-center space-x-2.5 mb-4 text-gray-900 dark:text-white font-semibold text-base border-b border-gray-100 dark:border-gray-700/60 pb-3">
+                        <i class="fa-solid fa-car text-brand-600 dark:text-brand-500"></i>
+                        <span>2. Vehicle & Fuel Database</span>
+                    </div>
+
+                    <div class="space-y-4">
+                        <!-- Vehicle Search & Dropdown -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Select from 50+ Car Models</label>
+                            <select id="presetVehicle" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-xs sm:text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none cursor-pointer">
+                                <option value="custom">-- Custom Specification --</option>
+                                <optgroup label="Toyota">
+                                    <option value="toyota_hilux">Toyota Hilux 2.8GD-6 (Diesel 9.2 L/100km)</option>
+                                    <option value="toyota_corolla">Toyota Corolla Quest 1.8 (Petrol 7.0 L/100km)</option>
+                                    <option value="toyota_corolla_cross">Toyota Corolla Cross Hybrid (3.9 L/100km)</option>
+                                    <option value="toyota_fortuner">Toyota Fortuner 2.8D (Diesel 8.6 L/100km)</option>
+                                    <option value="toyota_yaris">Toyota Yaris 1.5 (Petrol 5.9 L/100km)</option>
+                                    <option value="toyota_starlet">Toyota Starlet 1.5 (Petrol 5.4 L/100km)</option>
+                                </optgroup>
+                                <optgroup label="Volkswagen">
+                                    <option value="vw_polo">VW Polo 1.0 TSI (Petrol 5.3 L/100km)</option>
+                                    <option value="vw_polo_vivo">VW Polo Vivo 1.4 (Petrol 5.7 L/100km)</option>
+                                    <option value="vw_tiguan">VW Tiguan 2.0 TSI (Petrol 7.8 L/100km)</option>
+                                    <option value="vw_amarok">VW Amarok 3.0 V6 TDI (Diesel 9.5 L/100km)</option>
+                                    <option value="vw_golf_gti">VW Golf 8 GTI (Petrol 7.0 L/100km)</option>
+                                </optgroup>
+                                <optgroup label="Ford">
+                                    <option value="ford_ranger">Ford Ranger 2.0 Bi-Turbo (Diesel 8.8 L/100km)</option>
+                                    <option value="ford_everest">Ford Everest 3.0 V6 (Diesel 9.7 L/100km)</option>
+                                    <option value="ford_eco_sport">Ford EcoSport 1.5 (Petrol 6.4 L/100km)</option>
+                                </optgroup>
+                                <optgroup label="Hyundai / Kia">
+                                    <option value="hyundai_i10">Hyundai Grand i10 1.0 (Petrol 5.5 L/100km)</option>
+                                    <option value="hyundai_tucson">Hyundai Tucson 2.0 (Petrol 8.9 L/100km)</option>
+                                    <option value="kia_picanto">Kia Picanto 1.0 (Petrol 5.0 L/100km)</option>
+                                    <option value="kia_sportage">Kia Sportage 1.6 T-GDI (Petrol 7.3 L/100km)</option>
+                                </optgroup>
+                                <optgroup label="BMW / Mercedes / Audi">
+                                    <option value="bmw_320i">BMW 320i Sedan (Petrol 6.3 L/100km)</option>
+                                    <option value="bmw_320d">BMW 320d Diesel (Diesel 4.6 L/100km)</option>
+                                    <option value="bmw_x5">BMW X5 xDrive30d (Diesel 7.5 L/100km)</option>
+                                    <option value="mb_c200">Mercedes-Benz C200 (Petrol 6.6 L/100km)</option>
+                                    <option value="audi_a3">Audi A3 35 TFSI (Petrol 5.5 L/100km)</option>
+                                </optgroup>
+                                <optgroup label="Nissan / Suzuki / Isuzu">
+                                    <option value="suzuki_swift">Suzuki Swift 1.2 (Petrol 4.9 L/100km)</option>
+                                    <option value="suzuki_jimny">Suzuki Jimny 1.5 (Petrol 6.8 L/100km)</option>
+                                    <option value="isuzu_dmax">Isuzu D-Max 3.0 DDI (Diesel 8.4 L/100km)</option>
+                                    <option value="nissan_magnite">Nissan Magnite 1.0T (Petrol 6.0 L/100km)</option>
+                                </optgroup>
+                                <optgroup label="Electric Vehicles (EV)">
+                                    <option value="tesla_model_3">Tesla Model 3 Long Range (EV 14.7 kWh/100km)</option>
+                                    <option value="tesla_model_y">Tesla Model Y Dual Motor (EV 16.9 kWh/100km)</option>
+                                    <option value="byd_atto_3">BYD Atto 3 (EV 15.6 kWh/100km)</option>
+                                    <option value="ora_cat">GWM Ora 03 / Funky Cat (EV 16.5 kWh/100km)</option>
+                                    <option value="bmw_ix3">BMW iX3 Electric (EV 18.5 kWh/100km)</option>
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Engine / Fuel Type</label>
+                                <select id="fuelType" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-xs sm:text-sm text-gray-800 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                    <option value="petrol" selected>Petrol (Unleaded)</option>
+                                    <option value="diesel">Diesel</option>
+                                    <option value="electric">Electric (EV)</option>
+                                    <option value="hybrid">Hybrid</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1" id="lblConsumption">Consumption Rate</label>
+                                <div class="relative rounded-xl shadow-sm">
+                                    <input type="number" id="inputConsumption" min="0.5" step="0.1" value="7.2" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl pl-3 pr-16 py-2 text-xs sm:text-sm font-semibold text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400 text-xs font-medium" id="unitConsumption">
+                                        L/100km
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1" id="lblFuelPrice">Fuel Price / Electricity Tariff</label>
+                            <div class="relative rounded-xl shadow-sm">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 font-semibold text-xs sm:text-sm currency-symbol">
+                                    R
+                                </div>
+                                <input type="number" id="inputFuelPrice" min="0.01" step="0.01" value="23.50" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl pl-8 pr-16 py-2 text-xs sm:text-sm font-semibold text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400 text-xs font-medium" id="unitFuelPrice">
+                                    / Liter
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Tolls, Wear & Tear & Passenger Split -->
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 sm:p-6">
+                    <div class="flex items-center space-x-2.5 mb-4 text-gray-900 dark:text-white font-semibold text-base border-b border-gray-100 dark:border-gray-700/60 pb-3">
+                        <i class="fa-solid fa-calculator text-brand-600 dark:text-brand-500"></i>
+                        <span>3. Tolls, Wear & Passenger Split</span>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Toll Fees Total</label>
+                                <div class="relative rounded-xl shadow-sm">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 font-semibold text-xs currency-symbol">R</div>
+                                    <input type="number" id="inputTolls" min="0" step="1" value="0" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl pl-7 pr-3 py-2 text-xs sm:text-sm font-semibold text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                    Wear & Tear / Depreciation
+                                    <span class="text-[10px] text-gray-400">(per km)</span>
+                                </label>
+                                <div class="relative rounded-xl shadow-sm">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400 font-semibold text-xs currency-symbol">R</div>
+                                    <input type="number" id="inputWearRate" min="0" step="0.05" value="1.50" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl pl-7 pr-12 py-2 text-xs sm:text-sm font-semibold text-gray-900 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-gray-400 text-[10px]">/km</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Passenger Splitter -->
+                        <div class="p-3 bg-brand-50/50 dark:bg-brand-900/10 rounded-xl border border-brand-100 dark:border-brand-800/30">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="text-xs font-semibold text-brand-900 dark:text-brand-300 flex items-center space-x-1.5">
+                                    <i class="fa-solid fa-users"></i>
+                                    <span>Passenger Cost Splitter</span>
+                                </label>
+                                <span id="lblPassengers" class="text-xs font-bold text-brand-600 dark:text-brand-400">1 Person (Solo)</span>
+                            </div>
+                            <input type="range" id="rangePassengers" min="1" max="10" step="1" value="1" class="w-full accent-brand-600 bg-gray-200 dark:bg-gray-700 h-2 rounded-lg cursor-pointer">
+                            <div class="flex justify-between text-[10px] text-gray-400 mt-1">
+                                <span>Solo (1)</span>
+                                <span>5 People</span>
+                                <span>10 People</span>
+                            </div>
+                        </div>
+
+                        <!-- Timeframe Selection -->
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Timeframe Projection</label>
+                            <select id="timeframeSelect" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-gray-800 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none cursor-pointer">
+                                <option value="single">Single Trip (1 Day)</option>
+                                <option value="daily">Daily Commute (1 Trip/Day)</option>
+                                <option value="workweek" selected>Weekly Work Commute (5 Days / Week)</option>
+                                <option value="fullweek">Full Week Commute (7 Days / Week)</option>
+                                <option value="workmonth">Monthly Work Commute (~22 Days / Month)</option>
+                                <option value="fullmonth">Full Month Total (30 Days)</option>
+                                <option value="annual">Annual Commute Projection (365 Days)</option>
+                                <option value="custom">Custom Day Multiplier</option>
+                            </select>
+                        </div>
+
+                        <div id="customDaysContainer" class="hidden">
+                            <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Custom Days Count</label>
+                            <input type="number" id="inputCustomDays" min="1" max="1000" value="14" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-xs sm:text-sm font-medium text-gray-800 dark:text-white focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+
+                        <!-- Traffic Slider -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <label class="text-xs font-medium text-gray-600 dark:text-gray-400">Traffic & Driving Style Adjustment</label>
+                                <span id="lblTrafficMargin" class="text-xs font-bold text-brand-600 dark:text-brand-400">0% (Ideal)</span>
+                            </div>
+                            <input type="range" id="rangeTraffic" min="-20" max="40" step="5" value="0" class="w-full accent-brand-600 bg-gray-200 dark:bg-gray-700 h-2 rounded-lg cursor-pointer">
+                            <div class="flex justify-between text-[10px] text-gray-400 mt-1">
+                                <span>Eco (-20%)</span>
+                                <span>Ideal (0%)</span>
+                                <span>Traffic (+40%)</span>
+                            </div>
+                        </div>
+
+                        <div class="pt-2 flex space-x-3">
+                            <button id="btnSaveTrip" class="flex-1 bg-gray-900 dark:bg-gray-100 hover:bg-gray-800 dark:hover:bg-white text-white dark:text-gray-900 font-medium py-2 rounded-xl text-xs sm:text-sm transition-colors flex items-center justify-center space-x-1 shadow-sm">
+                                <i class="fa-solid fa-bookmark"></i>
+                                <span>Save Trip to Library</span>
+                            </button>
+                            <button id="btnReset" class="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-medium px-4 py-2 rounded-xl text-xs sm:text-sm transition-colors flex items-center justify-center space-x-1">
+                                <i class="fa-solid fa-rotate-left"></i>
+                                <span>Reset</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="lg:col-span-7 space-y-6">
+
+                <!-- Main Highlight Output Card -->
+                <div class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white rounded-2xl shadow-xl p-6 relative overflow-hidden print-card">
+                    <div class="absolute -right-6 -bottom-6 text-gray-800/40 pointer-events-none no-print">
+                        <i class="fa-solid fa-car-side text-9xl"></i>
+                    </div>
+
+                    <div class="relative z-10 space-y-4">
+                        <div class="flex justify-between items-center border-b border-gray-700/80 pb-3">
+                            <div class="flex items-center space-x-2">
+                                <span id="outputTimeframeBadge" class="bg-brand-500/20 text-brand-400 border border-brand-500/30 text-xs px-3 py-1 rounded-full font-medium">
+                                    Weekly Work Commute (5 Days)
+                                </span>
+                            </div>
+                            <span class="text-xs text-gray-400">Total Calculation Summary</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <p class="text-xs text-gray-400 font-medium mb-1">Total Trip Cost</p>
+                                <div class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white flex items-baseline space-x-1">
+                                    <span class="currency-symbol">R</span>
+                                    <span id="resTotalCost">0.00</span>
+                                </div>
+                                <p class="text-[11px] text-gray-400 mt-1" id="resCostPerKmDesc">Cost per km: R0.00</p>
+                            </div>
+
+                            <div>
+                                <p class="text-xs text-gray-400 font-medium mb-1">Per Person Share</p>
+                                <div class="text-3xl sm:text-4xl font-extrabold tracking-tight text-brand-400 flex items-baseline space-x-1">
+                                    <span class="currency-symbol">R</span>
+                                    <span id="resPerPersonCost">0.00</span>
+                                </div>
+                                <p class="text-[11px] text-gray-400 mt-1" id="resSplitDesc">Split between 1 person</p>
+                            </div>
+
+                            <div>
+                                <p class="text-xs text-gray-400 font-medium mb-1">Fuel / Energy Needed</p>
+                                <div class="text-3xl sm:text-4xl font-extrabold tracking-tight text-amber-400 flex items-baseline space-x-1">
+                                    <span id="resTotalFuel">0.0</span>
+                                    <span id="resFuelUnit" class="text-xl font-medium text-amber-300">L</span>
+                                </div>
+                                <p class="text-[11px] text-gray-400 mt-1" id="resTotalDistanceDesc">Total distance: 0 km</p>
+                            </div>
+                        </div>
+
+                        <!-- Detailed Cost Composition Progress Bar -->
+                        <div class="pt-3 border-t border-gray-700/60 space-y-2">
+                            <div class="flex justify-between text-xs text-gray-300 font-medium">
+                                <span>Cost Breakdown:</span>
+                                <div class="flex space-x-3 text-[11px]">
+                                    <span class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full bg-brand-500 inline-block"></span> <span>Fuel</span></span>
+                                    <span class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full bg-amber-500 inline-block"></span> <span>Tolls</span></span>
+                                    <span class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full bg-blue-500 inline-block"></span> <span>Wear</span></span>
+                                </div>
+                            </div>
+                            <div class="h-2.5 w-full bg-gray-700 rounded-full overflow-hidden flex">
+                                <div id="barFuel" class="bg-brand-500 h-full transition-all duration-300" style="width: 70%"></div>
+                                <div id="barTolls" class="bg-amber-500 h-full transition-all duration-300" style="width: 15%"></div>
+                                <div id="barWear" class="bg-blue-500 h-full transition-all duration-300" style="width: 15%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Carbon Footprint Metric -->
+                        <div class="pt-2 flex items-center justify-between text-xs text-gray-300">
+                            <div class="flex items-center space-x-2">
+                                <i class="fa-solid fa-leaf text-emerald-400"></i>
+                                <span>Estimated Carbon Footprint:</span>
+                            </div>
+                            <span id="resCarbonFootprint" class="font-bold text-emerald-400">0.0 kg CO₂</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Secondary Quick Metrics Cards -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 no-print">
+                    <div class="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm text-center">
+                        <i class="fa-solid fa-clock text-gray-400 text-xs mb-1"></i>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400 font-medium">Single Trip</p>
+                        <p class="text-base sm:text-lg font-bold text-gray-900 dark:text-white mt-0.5"><span class="currency-symbol">R</span><span id="resPerTripCost">0.00</span></p>
+                        <p class="text-[10px] text-gray-400" id="resPerTripFuel">0.0 L</p>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm text-center">
+                        <i class="fa-solid fa-calendar-day text-brand-500 text-xs mb-1"></i>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400 font-medium">Per Day</p>
+                        <p class="text-base sm:text-lg font-bold text-gray-900 dark:text-white mt-0.5"><span class="currency-symbol">R</span><span id="resPerDayCost">0.00</span></p>
+                        <p class="text-[10px] text-gray-400" id="resPerDayFuel">0.0 L</p>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm text-center">
+                        <i class="fa-solid fa-calendar-week text-blue-500 text-xs mb-1"></i>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400 font-medium">Per Week (7d)</p>
+                        <p class="text-base sm:text-lg font-bold text-gray-900 dark:text-white mt-0.5"><span class="currency-symbol">R</span><span id="resPerWeekCost">0.00</span></p>
+                        <p class="text-[10px] text-gray-400" id="resPerWeekFuel">0.0 L</p>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm text-center">
+                        <i class="fa-solid fa-calendar-days text-purple-500 text-xs mb-1"></i>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400 font-medium">Per Month (30d)</p>
+                        <p class="text-base sm:text-lg font-bold text-gray-900 dark:text-white mt-0.5"><span class="currency-symbol">R</span><span id="resPerMonthCost">0.00</span></p>
+                        <p class="text-[10px] text-gray-400" id="resPerMonthFuel">0.0 L</p>
+                    </div>
+                </div>
+
+                <!-- Visual Chart Section -->
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 sm:p-6 print-card">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-2">
+                            <i class="fa-solid fa-chart-simple text-brand-600 dark:text-brand-500"></i>
+                            <h3 class="font-semibold text-sm sm:text-base text-gray-900 dark:text-white">Cost & Fuel Multi-Timeframe Analytics</h3>
+                        </div>
+                        <span class="text-xs text-gray-400">Projections</span>
+                    </div>
+                    <div class="h-56 sm:h-64 relative">
+                        <canvas id="costChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Detailed Table Breakdown -->
+                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden print-card">
+                    <div class="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                        <h3 class="font-semibold text-sm text-gray-900 dark:text-white flex items-center space-x-2">
+                            <i class="fa-solid fa-table-list text-brand-600"></i>
+                            <span>Time Period Breakdown Table</span>
+                        </h3>
+                        <button id="btnExportCSV" class="text-xs text-brand-600 dark:text-brand-400 font-medium hover:underline flex items-center space-x-1 no-print">
+                            <i class="fa-solid fa-file-csv"></i>
+                            <span>Export CSV</span>
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs sm:text-sm">
+                            <thead class="bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 uppercase font-semibold text-[10px] tracking-wider">
+                                <tr>
+                                    <th class="px-4 py-3">Time Period</th>
+                                    <th class="px-4 py-3">Days</th>
+                                    <th class="px-4 py-3">Distance</th>
+                                    <th class="px-4 py-3">Fuel Needed</th>
+                                    <th class="px-4 py-3">CO₂ Emissions</th>
+                                    <th class="px-4 py-3 text-right">Est. Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBreakdownBody" class="divide-y divide-gray-100 dark:divide-gray-700 text-gray-700 dark:text-gray-300">
+                                <!-- Dynamic JS Population -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="savedTripsSection" class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-5 sm:p-6 no-print">
+                    <div class="flex items-center justify-between mb-4 border-b border-gray-100 dark:border-gray-700/60 pb-3">
+                        <div class="flex items-center space-x-2.5 text-gray-900 dark:text-white font-semibold text-base">
+                            <i class="fa-solid fa-bookmark text-brand-600 dark:text-brand-500"></i>
+                            <span>Saved Trips & Favorite Routes</span>
+                        </div>
+                        <button id="btnClearSavedTrips" class="text-xs text-red-500 hover:underline">Clear All</button>
+                    </div>
+                    <div id="savedTripsContainer" class="space-y-3 text-xs">
+                        <p class="text-gray-400 italic">No saved trips yet. Click "Save Trip to Library" above to store custom routes.</p>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // --- REGIONAL PRESETS & FUEL DATA ---
+        const regionData = {
+            ZA: { currency: 'R', fuelPrice: 23.50, wearRate: 1.50, tollPreset: 60, name: 'South Africa' },
+            US: { currency: '$', fuelPrice: 3.55, wearRate: 0.25, tollPreset: 5, name: 'United States' },
+            UK: { currency: '£', fuelPrice: 1.45, wearRate: 0.20, tollPreset: 4, name: 'United Kingdom' },
+            EU: { currency: '€', fuelPrice: 1.75, wearRate: 0.22, tollPreset: 6, name: 'Eurozone' },
+            AU: { currency: 'A$', fuelPrice: 1.95, wearRate: 0.30, tollPreset: 8, name: 'Australia' },
+            IN: { currency: '₹', fuelPrice: 102.50, wearRate: 5.00, tollPreset: 150, name: 'India' }
+        };
+
+        // --- EXTENDED VEHICLE DATABASE ---
+        const vehiclePresets = {
+            custom: null,
+            // Toyota
+            toyota_hilux: { fuelType: 'diesel', consumption: 9.2 },
+            toyota_corolla: { fuelType: 'petrol', consumption: 7.0 },
+            toyota_corolla_cross: { fuelType: 'hybrid', consumption: 3.9 },
+            toyota_fortuner: { fuelType: 'diesel', consumption: 8.6 },
+            toyota_yaris: { fuelType: 'petrol', consumption: 5.9 },
+            toyota_starlet: { fuelType: 'petrol', consumption: 5.4 },
+            // VW
+            vw_polo: { fuelType: 'petrol', consumption: 5.3 },
+            vw_polo_vivo: { fuelType: 'petrol', consumption: 5.7 },
+            vw_tiguan: { fuelType: 'petrol', consumption: 7.8 },
+            vw_amarok: { fuelType: 'diesel', consumption: 9.5 },
+            vw_golf_gti: { fuelType: 'petrol', consumption: 7.0 },
+            // Ford
+            ford_ranger: { fuelType: 'diesel', consumption: 8.8 },
+            ford_everest: { fuelType: 'diesel', consumption: 9.7 },
+            ford_eco_sport: { fuelType: 'petrol', consumption: 6.4 },
+            // Hyundai/Kia
+            hyundai_i10: { fuelType: 'petrol', consumption: 5.5 },
+            hyundai_tucson: { fuelType: 'petrol', consumption: 8.9 },
+            kia_picanto: { fuelType: 'petrol', consumption: 5.0 },
+            kia_sportage: { fuelType: 'petrol', consumption: 7.3 },
+            // Luxury
+            bmw_320i: { fuelType: 'petrol', consumption: 6.3 },
+            bmw_320d: { fuelType: 'diesel', consumption: 4.6 },
+            bmw_x5: { fuelType: 'diesel', consumption: 7.5 },
+            mb_c200: { fuelType: 'petrol', consumption: 6.6 },
+            audi_a3: { fuelType: 'petrol', consumption: 5.5 },
+            // Nissan/Suzuki
+            suzuki_swift: { fuelType: 'petrol', consumption: 4.9 },
+            suzuki_jimny: { fuelType: 'petrol', consumption: 6.8 },
+            isuzu_dmax: { fuelType: 'diesel', consumption: 8.4 },
+            nissan_magnite: { fuelType: 'petrol', consumption: 6.0 },
+            // EVs
+            tesla_model_3: { fuelType: 'electric', consumption: 14.7 },
+            tesla_model_y: { fuelType: 'electric', consumption: 16.9 },
+            byd_atto_3: { fuelType: 'electric', consumption: 15.6 },
+            ora_cat: { fuelType: 'electric', consumption: 16.5 },
+            bmw_ix3: { fuelType: 'electric', consumption: 18.5 }
+        };
+
+        // --- CO2 EMISSION FACTORS (kg CO2 per L or kWh) ---
+        const co2Factors = {
+            petrol: 2.31,
+            diesel: 2.68,
+            hybrid: 1.60,
+            electric: 0.45
+        };
+
+        // --- DOM ELEMENTS ---
+        const regionSelect = document.getElementById('regionSelect');
+        const currencySelect = document.getElementById('currencySelect');
+        const themeToggle = document.getElementById('themeToggle');
+        
+        const inputOrigin = document.getElementById('inputOrigin');
+        const inputDestination = document.getElementById('inputDestination');
+        const originSuggestions = document.getElementById('originSuggestions');
+        const destSuggestions = document.getElementById('destSuggestions');
+        const btnCalculateRoute = document.getElementById('btnCalculateRoute');
+        const routeStatusBadge = document.getElementById('routeStatusBadge');
+        
+        const inputDistance = document.getElementById('inputDistance');
+        const checkRoundTrip = document.getElementById('checkRoundTrip');
+        
+        const presetVehicle = document.getElementById('presetVehicle');
+        const fuelType = document.getElementById('fuelType');
+        const inputConsumption = document.getElementById('inputConsumption');
+        const inputFuelPrice = document.getElementById('inputFuelPrice');
+        const lblConsumption = document.getElementById('lblConsumption');
+        const unitConsumption = document.getElementById('unitConsumption');
+        const lblFuelPrice = document.getElementById('lblFuelPrice');
+        const unitFuelPrice = document.getElementById('unitFuelPrice');
+        
+        const inputTolls = document.getElementById('inputTolls');
+        const inputWearRate = document.getElementById('inputWearRate');
+        const rangePassengers = document.getElementById('rangePassengers');
+        const lblPassengers = document.getElementById('lblPassengers');
+        
+        const timeframeSelect = document.getElementById('timeframeSelect');
+        const customDaysContainer = document.getElementById('customDaysContainer');
+        const inputCustomDays = document.getElementById('inputCustomDays');
+        const rangeTraffic = document.getElementById('rangeTraffic');
+        const lblTrafficMargin = document.getElementById('lblTrafficMargin');
+        
+        const resTotalCost = document.getElementById('resTotalCost');
+        const resPerPersonCost = document.getElementById('resPerPersonCost');
+        const resSplitDesc = document.getElementById('resSplitDesc');
+        const resTotalFuel = document.getElementById('resTotalFuel');
+        const resFuelUnit = document.getElementById('resFuelUnit');
+        const resCostPerKmDesc = document.getElementById('resCostPerKmDesc');
+        const resTotalDistanceDesc = document.getElementById('resTotalDistanceDesc');
+        const resCarbonFootprint = document.getElementById('resCarbonFootprint');
+        const outputTimeframeBadge = document.getElementById('outputTimeframeBadge');
+
+        const barFuel = document.getElementById('barFuel');
+        const barTolls = document.getElementById('barTolls');
+        const barWear = document.getElementById('barWear');
+
+        const resPerTripCost = document.getElementById('resPerTripCost');
+        const resPerTripFuel = document.getElementById('resPerTripFuel');
+        const resPerDayCost = document.getElementById('resPerDayCost');
+        const resPerDayFuel = document.getElementById('resPerDayFuel');
+        const resPerWeekCost = document.getElementById('resPerWeekCost');
+        const resPerWeekFuel = document.getElementById('resPerWeekFuel');
+        const resPerMonthCost = document.getElementById('resPerMonthCost');
+        const resPerMonthFuel = document.getElementById('resPerMonthFuel');
+
+        const tableBreakdownBody = document.getElementById('tableBreakdownBody');
+        const savedTripsContainer = document.getElementById('savedTripsContainer');
+        const btnSaveTrip = document.getElementById('btnSaveTrip');
+        const btnClearSavedTrips = document.getElementById('btnClearSavedTrips');
+        const btnReset = document.getElementById('btnReset');
+        const btnExportCSV = document.getElementById('btnExportCSV');
+
+        let myChart = null;
+        let map = null;
+        let routeLayer = null;
+        let originCoords = null;
+        let destCoords = null;
+
+        function initMap() {
+            map = L.map('map').setView([-26.2041, 28.0473], 10); // Default Johannesburg
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+        }
+
+        function setupAutocomplete(inputEl, suggestionsEl, onSelect) {
+            let debounceTimeout = null;
+            inputEl.addEventListener('input', () => {
+                clearTimeout(debounceTimeout);
+                const query = inputEl.value.trim();
+                if (query.length < 3) {
+                    suggestionsEl.classList.add('hidden');
+                    return;
+                }
+                debounceTimeout = setTimeout(() => {
+                    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            suggestionsEl.innerHTML = '';
+                            if (data.length === 0) {
+                                suggestionsEl.classList.add('hidden');
+                                return;
+                            }
+                            data.slice(0, 5).forEach(item => {
+                                const div = document.createElement('div');
+                                div.className = 'p-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-gray-800 dark:text-gray-200 transition-colors';
+                                div.textContent = item.display_name;
+                                div.addEventListener('click', () => {
+                                    inputEl.value = item.display_name;
+                                    suggestionsEl.classList.add('hidden');
+                                    onSelect({ lat: parseFloat(item.lat), lon: parseFloat(item.lon) });
+                                });
+                                suggestionsEl.appendChild(div);
+                            });
+                            suggestionsEl.classList.remove('hidden');
+                        }).catch(() => suggestionsEl.classList.add('hidden'));
+                }, 300);
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!inputEl.contains(e.target) && !suggestionsEl.contains(e.target)) {
+                    suggestionsEl.classList.add('hidden');
+                }
+            });
+        }
+
+        function calculateOSRMRoute() {
+            if (!originCoords || !destCoords) {
+                routeStatusBadge.textContent = "Please select both locations";
+                routeStatusBadge.className = "text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium";
+                return;
+            }
+
+            routeStatusBadge.textContent = "Fetching Route...";
+            routeStatusBadge.className = "text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium";
+
+            const url = `https://router.project-osrm.org/route/v1/driving/${originCoords.lon},${originCoords.lat};${destCoords.lon},${destCoords.lat}?overview=full&geometries=geojson`;
+
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.routes && data.routes.length > 0) {
+                        const route = data.routes[0];
+                        const distanceKm = (route.distance / 1000).toFixed(1);
+                        inputDistance.value = distanceKm;
+
+                        if (routeLayer) map.removeLayer(routeLayer);
+
+                        routeLayer = L.geoJSON(route.geometry, {
+                            style: { color: '#22c55e', weight: 5, opacity: 0.8 }
+                        }).addTo(map);
+
+                        map.fitBounds(routeLayer.getBounds(), { padding: [30, 30] });
+
+                        routeStatusBadge.textContent = `Route Resolved: ${distanceKm} km`;
+                        routeStatusBadge.className = "text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium";
+
+                        calculate();
+                    } else {
+                        throw new Error("No route found");
+                    }
+                })
+                .catch(err => {
+                    routeStatusBadge.textContent = "OSRM Routing Failed";
+                    routeStatusBadge.className = "text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium";
+                });
+        }
+
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        themeToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark');
+            calculate();
+        });
+
+        regionSelect.addEventListener('change', () => {
+            const reg = regionData[regionSelect.value];
+            if (reg) {
+                currencySelect.value = reg.currency;
+                inputFuelPrice.value = reg.fuelPrice;
+                inputWearRate.value = reg.wearRate;
+                calculate();
+            }
+        });
+
+        function setPresetDistance(km) {
+            inputDistance.value = km;
+            calculate();
+        }
+
+        function calculate() {
+            const currency = currencySelect.value;
+            document.querySelectorAll('.currency-symbol').forEach(el => el.textContent = currency);
+
+            const oneWayDist = parseFloat(inputDistance.value) || 0;
+            const isRoundTrip = checkRoundTrip.checked;
+            const tripDist = isRoundTrip ? oneWayDist * 2 : oneWayDist;
+
+            const engineType = fuelType.value;
+            const isEV = engineType === 'electric';
+            const rate = parseFloat(inputConsumption.value) || 0;
+            const unitText = isEV ? 'kWh' : 'L';
+            const price = parseFloat(inputFuelPrice.value) || 0;
+
+            if (isEV) {
+                lblConsumption.textContent = "Energy Consumption";
+                unitConsumption.textContent = "kWh/100km";
+                lblFuelPrice.textContent = "Electricity Tariff";
+                unitFuelPrice.textContent = "/ kWh";
+            } else {
+                lblConsumption.textContent = "Consumption Rate";
+                unitConsumption.textContent = "L/100km";
+                lblFuelPrice.textContent = "Fuel Price";
+                unitFuelPrice.textContent = "/ Liter";
+            }
+            resFuelUnit.textContent = unitText;
+
+            const trafficValue = parseInt(rangeTraffic.value) || 0;
+            lblTrafficMargin.textContent = trafficValue >= 0 ? `+${trafficValue}%` : `${trafficValue}%`;
+            const adjustedRate = rate * (1 + (trafficValue / 100));
+
+            // Single Trip Costs
+            const fuelPerTrip = (tripDist * adjustedRate) / 100;
+            const fuelCostPerTrip = fuelPerTrip * price;
+            const tollCostPerTrip = parseFloat(inputTolls.value) || 0;
+            const wearRate = parseFloat(inputWearRate.value) || 0;
+            const wearCostPerTrip = tripDist * wearRate;
+
+            const totalCostPerTrip = fuelCostPerTrip + tollCostPerTrip + wearCostPerTrip;
+            const costPerKm = tripDist > 0 ? (totalCostPerTrip / tripDist) : 0;
+            const co2Factor = co2Factors[engineType] || 2.31;
+            const co2PerTrip = fuelPerTrip * co2Factor;
+
+            // Passengers
+            const passengers = parseInt(rangePassengers.value) || 1;
+            lblPassengers.textContent = passengers === 1 ? '1 Person (Solo)' : `${passengers} People`;
+
+            // Timeframe Calculation
+            const timeframe = timeframeSelect.value;
+            let daysMultiplier = 1;
+            let badgeText = "Single Trip (1 Day)";
+
+            if (timeframe === 'custom') {
+                customDaysContainer.classList.remove('hidden');
+                daysMultiplier = parseInt(inputCustomDays.value) || 1;
+                badgeText = `Custom Timeframe (${daysMultiplier} Days)`;
+            } else {
+                customDaysContainer.classList.add('hidden');
+                switch (timeframe) {
+                    case 'single':
+                    case 'daily':
+                        daysMultiplier = 1;
+                        badgeText = timeframe === 'single' ? "Single Trip (1 Day)" : "Daily Commute (1 Day)";
+                        break;
+                    case 'workweek':
+                        daysMultiplier = 5;
+                        badgeText = "Weekly Work Commute (5 Days)";
+                        break;
+                    case 'fullweek':
+                        daysMultiplier = 7;
+                        badgeText = "Full Week Commute (7 Days)";
+                        break;
+                    case 'workmonth':
+                        daysMultiplier = 22;
+                        badgeText = "Monthly Work Commute (22 Days)";
+                        break;
+                    case 'fullmonth':
+                        daysMultiplier = 30;
+                        badgeText = "Full Month Total (30 Days)";
+                        break;
+                    case 'annual':
+                        daysMultiplier = 365;
+                        badgeText = "Annual Commute (365 Days)";
+                        break;
+                }
+            }
+
+            outputTimeframeBadge.textContent = badgeText;
+
+            // Timeframe Totals
+            const totalDistance = tripDist * daysMultiplier;
+            const totalFuel = fuelPerTrip * daysMultiplier;
+            const totalCost = totalCostPerTrip * daysMultiplier;
+            const totalCO2 = co2PerTrip * daysMultiplier;
+            const perPersonCost = totalCost / passengers;
+
+            // Display Results
+            resTotalCost.textContent = totalCost.toFixed(2);
+            resPerPersonCost.textContent = perPersonCost.toFixed(2);
+            resSplitDesc.textContent = passengers === 1 ? 'Solo trip (no split)' : `Split equally among ${passengers} people`;
+            resTotalFuel.textContent = totalFuel.toFixed(1);
+            resCostPerKmDesc.textContent = `Cost per km: ${currency}${costPerKm.toFixed(2)}`;
+            resTotalDistanceDesc.textContent = `Total distance: ${totalDistance.toLocaleString()} km (${daysMultiplier} days)`;
+            resCarbonFootprint.textContent = `${totalCO2.toFixed(1)} kg CO₂`;
+
+            // Cost Composition Progress Bars
+            const totalSum = (fuelCostPerTrip + tollCostPerTrip + wearCostPerTrip) || 1;
+            barFuel.style.width = `${((fuelCostPerTrip / totalSum) * 100).toFixed(0)}%`;
+            barTolls.style.width = `${((tollCostPerTrip / totalSum) * 100).toFixed(0)}%`;
+            barWear.style.width = `${((wearCostPerTrip / totalSum) * 100).toFixed(0)}%`;
+
+            // Quick Metrics
+            resPerTripCost.textContent = totalCostPerTrip.toFixed(2);
+            resPerTripFuel.textContent = `${fuelPerTrip.toFixed(1)} ${unitText}`;
+
+            resPerDayCost.textContent = totalCostPerTrip.toFixed(2);
+            resPerDayFuel.textContent = `${fuelPerTrip.toFixed(1)} ${unitText}`;
+
+            resPerWeekCost.textContent = (totalCostPerTrip * 7).toFixed(2);
+            resPerWeekFuel.textContent = `${(fuelPerTrip * 7).toFixed(1)} ${unitText}`;
+
+            resPerMonthCost.textContent = (totalCostPerTrip * 30).toFixed(2);
+            resPerMonthFuel.textContent = `${(fuelPerTrip * 30).toFixed(1)} ${unitText}`;
+
+            // Update Table & Chart
+            updateTable({ currency, tripDist, fuelPerTrip, totalCostPerTrip, co2PerTrip, unitText });
+            updateChartData(totalCostPerTrip);
+        }
+
+        function updateTable(data) {
+            const periods = [
+                { name: 'Single Trip', days: 1 },
+                { name: 'Work Week', days: 5 },
+                { name: 'Full Week', days: 7 },
+                { name: 'Work Month', days: 22 },
+                { name: 'Full Month', days: 30 },
+                { name: 'Annual', days: 365 }
+            ];
+
+            tableBreakdownBody.innerHTML = periods.map(p => {
+                const dist = data.tripDist * p.days;
+                const fuel = data.fuelPerTrip * p.days;
+                const cost = data.totalCostPerTrip * p.days;
+                const co2 = data.co2PerTrip * p.days;
+
+                return `
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition-colors">
+                        <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">${p.name}</td>
+                        <td class="px-4 py-3">${p.days}</td>
+                        <td class="px-4 py-3">${dist.toLocaleString()} km</td>
+                        <td class="px-4 py-3">${fuel.toFixed(1)} ${data.unitText}</td>
+                        <td class="px-4 py-3">${co2.toFixed(1)} kg</td>
+                        <td class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">${data.currency}${cost.toFixed(2)}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function initChart() {
+            const ctx = document.getElementById('costChart').getContext('2d');
+            const isDark = document.documentElement.classList.contains('dark');
+
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['1 Trip', '1 Day', '1 Week (7d)', '1 Month (30d)', '1 Year (365d)'],
+                    datasets: [{
+                        label: 'Estimated Cost',
+                        data: [0, 0, 0, 0, 0],
+                        backgroundColor: '#22c55e',
+                        borderRadius: 8,
+                        hoverBackgroundColor: '#16a34a'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => {
+                                    const curr = currencySelect.value;
+                                    return ` Cost: ${curr}${context.parsed.y.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: isDark ? '#9ca3af' : '#4b5563' }
+                        },
+                        y: {
+                            grid: { color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' },
+                            ticks: { color: isDark ? '#9ca3af' : '#4b5563' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateChartData(costPerTrip) {
+            if (!myChart) return;
+            const data = [costPerTrip, costPerTrip, costPerTrip * 7, costPerTrip * 30, costPerTrip * 365];
+            myChart.data.datasets[0].data = data;
+            const isDark = document.documentElement.classList.contains('dark');
+            myChart.options.scales.x.ticks.color = isDark ? '#9ca3af' : '#4b5563';
+            myChart.options.scales.y.ticks.color = isDark ? '#9ca3af' : '#4b5563';
+            myChart.options.scales.y.grid.color = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+            myChart.update();
+        }
+
+        function getSavedTrips() {
+            return JSON.parse(localStorage.getItem('fuel_trip_saved') || '[]');
+        }
+
+        function renderSavedTrips() {
+            const trips = getSavedTrips();
+            if (trips.length === 0) {
+                savedTripsContainer.innerHTML = '<p class="text-gray-400 italic">No saved trips yet. Click "Save Trip to Library" above to store custom routes.</p>';
+                return;
+            }
+
+            savedTripsContainer.innerHTML = trips.map((trip, idx) => `
+                <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600">
+                    <div>
+                        <p class="font-semibold text-gray-900 dark:text-white">${trip.origin || 'Custom Origin'} ➔ ${trip.dest || 'Custom Destination'}</p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">${trip.dist} km | ${trip.vehicle} | ${trip.currency}${trip.cost}</p>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button onclick="loadSavedTrip(${idx})" class="text-brand-600 dark:text-brand-400 font-medium hover:underline">Load</button>
+                        <button onclick="deleteSavedTrip(${idx})" class="text-red-500 hover:underline">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        window.loadSavedTrip = function(idx) {
+            const trips = getSavedTrips();
+            const trip = trips[idx];
+            if (trip) {
+                inputOrigin.value = trip.origin || '';
+                inputDestination.value = trip.dest || '';
+                inputDistance.value = trip.dist;
+                calculate();
+            }
+        };
+
+        window.deleteSavedTrip = function(idx) {
+            const trips = getSavedTrips();
+            trips.splice(idx, 1);
+            localStorage.setItem('fuel_trip_saved', JSON.stringify(trips));
+            renderSavedTrips();
+        };
+
+        btnSaveTrip.addEventListener('click', () => {
+            const trips = getSavedTrips();
+            trips.push({
+                origin: inputOrigin.value,
+                dest: inputDestination.value,
+                dist: inputDistance.value,
+                vehicle: presetVehicle.options[presetVehicle.selectedIndex].text,
+                cost: resTotalCost.textContent,
+                currency: currencySelect.value
+            });
+            localStorage.setItem('fuel_trip_saved', JSON.stringify(trips));
+            renderSavedTrips();
+        });
+
+        btnClearSavedTrips.addEventListener('click', () => {
+            localStorage.removeItem('fuel_trip_saved');
+            renderSavedTrips();
+        });
+
+        presetVehicle.addEventListener('change', () => {
+            const presetKey = presetVehicle.value;
+            if (presetKey !== 'custom' && vehiclePresets[presetKey]) {
+                const preset = vehiclePresets[presetKey];
+                fuelType.value = preset.fuelType;
+                inputConsumption.value = preset.consumption;
+            }
+            calculate();
+        });
+
+        setupAutocomplete(inputOrigin, originSuggestions, (coords) => { originCoords = coords; });
+        setupAutocomplete(inputDestination, destSuggestions, (coords) => { destCoords = coords; });
+        btnCalculateRoute.addEventListener('click', calculateOSRMRoute);
+
+        [inputDistance, checkRoundTrip, fuelType, inputConsumption, inputFuelPrice, inputTolls, inputWearRate, rangePassengers, timeframeSelect, inputCustomDays, rangeTraffic, currencySelect].forEach(element => {
+            element.addEventListener('input', calculate);
+            element.addEventListener('change', calculate);
+        });
+
+        btnReset.addEventListener('click', () => {
+            inputOrigin.value = '';
+            inputDestination.value = '';
+            inputDistance.value = '50';
+            checkRoundTrip.checked = true;
+            presetVehicle.value = 'custom';
+            fuelType.value = 'petrol';
+            inputConsumption.value = '7.2';
+            inputTolls.value = '0';
+            inputWearRate.value = '1.50';
+            rangePassengers.value = '1';
+            timeframeSelect.value = 'workweek';
+            rangeTraffic.value = '0';
+            calculate();
+        });
+
+        btnExportCSV.addEventListener('click', () => {
+            const currency = currencySelect.value;
+            const rows = [["Time Period", "Days", "Distance (km)", "Fuel Required", "CO2 Emissions (kg)", `Est. Cost (${currency})`]];
+            const tbodyRows = tableBreakdownBody.querySelectorAll('tr');
+            tbodyRows.forEach(row => {
+                const cols = row.querySelectorAll('td');
+                if (cols.length >= 6) {
+                    rows.push([cols[0].innerText, cols[1].innerText, cols[2].innerText, cols[3].innerText, cols[4].innerText, cols[5].innerText.replace(currency, '')]);
+                }
+            });
+            const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
+            const link = document.createElement("a");
+            link.setAttribute("href", encodeURI(csvContent));
+            link.setAttribute("download", "FuelTrip_Report.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        window.onload = function() {
+            initMap();
+            initChart();
+            renderSavedTrips();
+            calculate();
+        };
+    </script>
+</body>
+</html>
