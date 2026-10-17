@@ -1274,6 +1274,20 @@ const esritiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', 
             renderTaxLogs();
             calculate();
         });
-    </script>
+   async function updateFuelPrice() {
+    try {
+        // Replace with your API endpoint
+        const response = await fetch('https://api.example.com/fuel-price');
+        const data = await response.json();
+        const fuelPriceInput = document.getElementById('inputFuelPrice');
+        if (fuelPriceInput && data.price) {
+            fuelPriceInput.value = data.price;
+            calculate(); // Recalculate costs with new price
+        }
+    } catch (error) {
+        console.error('Error fetching fuel price:', error);
+    }
+}
+updateFuelPrice(); </script>
 </body>
 </html>
