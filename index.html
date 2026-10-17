@@ -833,12 +833,12 @@ const esritiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', 
 });
 
             // Add primary layer to map
-            cartoTiles.addTo(map);
+            cartotiles.addTo(map);
 
             // Error handling listener for tiles
-            cartoTiles.on('tileerror', function(error, tile) {
+            cartotiles.on('tileerror', function(error, tile) {
                 console.warn('Primary tiles failed to load, switching to backup provider...');
-                map.removeLayer(cartoTiles);
+                map.removeLayer(cartotiles);
                 esriTiles.addTo(map);
             });
         }
